@@ -539,3 +539,15 @@ body {
 .actions-block .cert-block { margin-bottom: 0; }
 .hof-submit-block .btn:disabled,
 .cert-block .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.btn-hof-nav, a.btn-hof-nav {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}

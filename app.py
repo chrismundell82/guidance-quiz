@@ -100,39 +100,53 @@ def migrate_from_excel():
                 cur.execute("SELECT COUNT(*) FROM questions")
                 if cur.fetchone()["count"] > 0:
                     return  # Already seeded
-            
+
             df = pd.read_excel(EXCEL_PATH, sheet_name="Questions")
             df.columns = df.columns.str.strip()
-            
+
+            # Reverse map: "Guidance Guardian" -> "guardian" etc
+            reverse_map = {v: k for k, v in DIFFICULTY_MAP.items()}
+
+            inserted = 0
             with conn.cursor() as cur:
                 for _, row in df.iterrows():
                     question_text = str(row.get("Question", "")).strip()
-                    if not question_text or question_text == "nan":
+                    if not question_text or question_text.lower() == "nan":
                         continue
-                    
+
                     difficulty_raw = str(row.get("Difficulty", "")).strip()
-                    diff_key = {v: k for k, v in DIFFICULTY_MAP.items()}.get(difficulty_raw, "guardian")
-                    
+                    diff_key = reverse_map.get(difficulty_raw)
+                    if not diff_key:
+                        continue  # Skip rows with unrecognised difficulty
+
                     answer_raw = str(row.get("Answer", "A")).strip()
-                    correct = answer_raw[0].upper() if answer_raw else "A"
-                    
+                    correct = answer_raw[0].upper() if answer_raw and answer_raw[0].upper() in "ABCD" else "A"
+
+                    opt_a = str(row.get("A", "")).strip()
+                    opt_b = str(row.get("B", "")).strip()
+                    opt_c = str(row.get("C", "")).strip() or None
+                    opt_d = str(row.get("D", "")).strip() or None
+
+                    if not opt_a or not opt_b:
+                        continue  # Need at least two options
+
+                    # Clean up "nan" strings
+                    if opt_c == "nan": opt_c = None
+                    if opt_d == "nan": opt_d = None
+
+                    ref = str(row.get("Ref", "")).strip()
+                    if ref == "nan": ref = None
+
                     cur.execute("""
                         INSERT INTO questions (difficulty, ref, question, option_a, option_b, option_c, option_d, correct_answer)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        diff_key,
-                        str(row.get("Ref", "")).strip(),
-                        question_text,
-                        str(row.get("A", "")).strip(),
-                        str(row.get("B", "")).strip(),
-                        str(row.get("C", "")).strip() or None,
-                        str(row.get("D", "")).strip() or None,
-                        correct
-                    ))
+                    """, (diff_key, ref, question_text, opt_a, opt_b, opt_c, opt_d, correct))
+                    inserted += 1
+
             conn.commit()
-            print(f"Migrated questions from Excel to DB")
+            print(f"Migrated {inserted} questions from Excel to DB")
     except Exception as e:
-        print(f"Migration warning: {e}")
+        print(f"Migration error: {e}")
 
 
 def load_questions(difficulty_key):
@@ -553,6 +567,53 @@ def download_certificate():
         as_attachment=True,
         download_name=filename
     )
+
+
+@app.route("/admin/migrate")
+def admin_migrate():
+    if not admin_required():
+        from flask import redirect, url_for
+        return redirect(url_for("admin"))
+    try:
+        # Force re-migrate by temporarily clearing and re-seeding
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM questions")
+                count_before = cur.fetchone()["count"]
+        
+        if count_before > 0:
+            return f"<p>Already have {count_before} questions in DB. <a href='/admin'>Back to admin</a></p>"
+        
+        migrate_from_excel()
+        
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM questions")
+                count_after = cur.fetchone()["count"]
+        
+        return f"<p>Migration complete! {count_after} questions imported. <a href='/admin'>Back to admin</a></p>"
+    except Exception as e:
+        return f"<p>Error: {e} <a href='/admin'>Back to admin</a></p>"
+
+
+@app.route("/admin/force-migrate")
+def admin_force_migrate():
+    if not admin_required():
+        from flask import redirect, url_for
+        return redirect(url_for("admin"))
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM questions")
+            conn.commit()
+        migrate_from_excel()
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM questions")
+                count = cur.fetchone()["count"]
+        return f"<p>Force migration complete! {count} questions imported. <a href='/admin'>Back to admin</a></p>"
+    except Exception as e:
+        return f"<p>Error: {e} <a href='/admin'>Back to admin</a></p>"
 
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
