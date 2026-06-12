@@ -2,7 +2,125 @@
 //  AtkinsRéalis Guidance Notes Quiz — Frontend Logic
 // ============================================================
 
-let questions = [];
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+const HERO_NOTES = [
+  "Warning: may cause mild smugness or existential crisis. Side effects are your own problem.",
+  "Not responsible for damage to professional relationships caused by bragging about your score.",
+  "Side effects include: overconfidence at technical reviews, unsolicited guidance note recommendations.",
+  "Results may vary. Void where prohibited by actual knowledge of structural engineering.",
+  "The bridges cannot be held responsible for any score-related hubris.",
+  "Disclaimer: this quiz is harder than it looks. Or easier. We genuinely don't know your level.",
+  "By starting this quiz you agree that your score is entirely your own fault.",
+  "100% scientifically valid. Probably. We didn't check.",
+];
+
+const LOADING_MESSAGES = [
+  "Fetching questions from the guidance note archives...\nPlease hold. The engineers are thinking.",
+  "Consulting the ancient scrolls of structural guidance...\nThis may take a moment. They're very long.",
+  "Dusting off the guidance notes...\nSomeone has to.",
+  "Selecting your questions with great seriousness and absolutely no randomness...\nOK, some randomness.",
+  "Briefing the quiz on your difficulty level...\nIt's judging you already.",
+  "Waking up the database...\nIt was having a perfectly nice nap.",
+  "Loading questions...\nTrying to find ones you won't immediately Google.",
+  "Preparing your intellectual challenge...\nThe bridges are watching.",
+];
+
+const HOF_LOADING_MESSAGES = [
+  "Loading the legends...",
+  "Consulting the Hall of Fame archives...",
+  "Summoning the high scorers...",
+  "Fetching the engineering elite...",
+  "Loading those who actually read the guidance notes...",
+];
+
+const UNANSWERED_MESSAGES = [
+  n => `You've left ${n} question(s) unanswered. That's very on-brand for a Monday. Submit anyway?`,
+  n => `${n} question(s) skipped. Bold strategy. The bridges are concerned. Submit anyway?`,
+  n => `${n} unanswered question(s) detected. Leaving them blank doesn't make them go away. Submit anyway?`,
+  n => `You've ignored ${n} question(s). Impressive confidence. Submit anyway?`,
+  n => `${n} question(s) ghosted. They have feelings, you know. Submit anyway?`,
+];
+
+const RANK_MESSAGES = [
+  rank => rank === 1 ? "YOU'RE NUMBER ONE! Top of the leaderboard — frame this moment." :
+          rank <= 3  ? `Rank #${rank}! Podium finish. The guidance gods smile upon you.` :
+          rank <= 10 ? `Rank #${rank} — Top 10! Not bad at all, hotshot.` :
+                       `Rank #${rank} — you're on the board! Every legend starts somewhere.`,
+  rank => rank === 1 ? "FIRST PLACE! The bridges bow before you. Genuinely." :
+          rank <= 3  ? `Top ${rank}! Podium engineering. Your mother would be proud.` :
+          rank <= 10 ? `Rank #${rank}! Top 10 is no joke. Take the afternoon off.` :
+                       `Rank #${rank}. On the board is on the board. Rome wasn't built in a day.`,
+  rank => rank === 1 ? "Absolute scenes. Number one. The Hall of Fame has never seen such glory." :
+          rank <= 3  ? `Rank #${rank}. Bronze, silver, or gold — all taste like victory.` :
+          rank <= 10 ? `Rank #${rank}. Top 10 out of everyone who tried. Not nothing.` :
+                       `Rank #${rank}. You exist on the leaderboard. That's something.`,
+];
+
+const GUARDIAN_DESCS = [
+  "The \"I've skimmed the title page\" tier. Easy questions for the brave but sensible.",
+  "For people who have heard of guidance notes. Possibly even seen one.",
+  "Easy mode. No shame. The guidance notes welcome all readers, even reluctant ones.",
+  "A gentle introduction. Like the guidance notes, but shorter. And with answers.",
+  "You know the basics. Or you're about to find out if you do.",
+];
+const CHAMPION_DESCS = [
+  "You've actually opened a few guidance notes. Respect. Medium difficulty awaits.",
+  "For those who've attended at least one meeting where guidance was mentioned.",
+  "You've moved beyond title pages. Into the contents section, at minimum.",
+  "Medium difficulty. You know enough to be worried about what you don't know.",
+  "The sweet spot between overconfident and terrified.",
+];
+const GOD_DESCS = [
+  "You breathe guidance notes. You probably wrote some. Hard questions only. Legends only.",
+  "For those who have the guidance notes memorised. And correct the ones who don't.",
+  "Hard mode. Only for the truly committed. Or the truly reckless.",
+  "If you're choosing this, you'd better be Chris Hendy. Or his equal.",
+  "The final frontier of guidance knowledge. Legends only. You've been warned.",
+];
+const COUNT_DESCS_10 = [
+  "Quick coffee break", "Rapid fire", "Short and sharp", "In and out", "For the time-poor engineer",
+];
+const COUNT_DESCS_20 = [
+  "Full lunch hour", "Decent commitment", "The standard experience", "Goldilocks zone", "Not too short, not too long",
+];
+const COUNT_DESCS_30 = [
+  "You're either keen or procrastinating", "Full dedication", "The long game", "Absolute unit energy", "Are you OK? That's a lot of questions",
+];
+
+function initPage() {
+  const heroNote = document.getElementById('hero-note');
+  if (heroNote) heroNote.textContent = pick(HERO_NOTES);
+
+  const dg = document.getElementById('desc-guardian');
+  if (dg) dg.textContent = pick(GUARDIAN_DESCS);
+  const dc = document.getElementById('desc-champion');
+  if (dc) dc.textContent = pick(CHAMPION_DESCS);
+  const dd = document.getElementById('desc-god');
+  if (dd) dd.textContent = pick(GOD_DESCS);
+
+  const c10 = document.getElementById('count-desc-10');
+  if (c10) c10.textContent = pick(COUNT_DESCS_10);
+  const c20 = document.getElementById('count-desc-20');
+  if (c20) c20.textContent = pick(COUNT_DESCS_20);
+  const c30 = document.getElementById('count-desc-30');
+  if (c30) c30.textContent = pick(COUNT_DESCS_30);
+}
+
+function setLoadingText() {
+  const el = document.getElementById('loading-text');
+  if (el) el.innerHTML = pick(LOADING_MESSAGES).replace('\n', '<br><em>').replace(/(.+)/, '$1') + (pick(LOADING_MESSAGES).includes('\n') ? '</em>' : '');
+  // simpler:
+  if (el) {
+    const msg = pick(LOADING_MESSAGES);
+    const parts = msg.split('\n');
+    el.innerHTML = parts[0] + (parts[1] ? `<br><em>${parts[1]}</em>` : '');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initPage);
+
+
 let currentIndex = 0;
 let answers = {};
 let quizResult = null;
@@ -28,6 +146,7 @@ async function startQuiz() {
   const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
   const count = parseInt(document.querySelector('input[name="count"]:checked').value);
 
+  setLoadingText();
   showScreen('screen-loading');
 
   try {
@@ -126,7 +245,7 @@ async function submitQuiz() {
   // Check for unanswered questions
   const unanswered = questions.filter((_, i) => !answers[i]);
   if (unanswered.length > 0) {
-    const go = confirm(`You've left ${unanswered.length} question(s) unanswered. That's very on-brand for a Monday. Submit anyway?`);
+    const go = confirm(pick(UNANSWERED_MESSAGES)(unanswered.length));
     if (!go) return;
   }
 
@@ -332,6 +451,7 @@ function showHallOfFame() {
 
 async function loadHoF() {
   document.getElementById('hof-loading').style.display = 'block';
+  document.getElementById('hof-loading').innerHTML = pick(HOF_LOADING_MESSAGES);
   document.getElementById('hof-table-wrap').style.display = 'none';
   document.getElementById('hof-empty').style.display = 'none';
 
@@ -403,14 +523,7 @@ async function submitToHoF() {
     const data = await res.json();
 
     if (data.success) {
-      const rankMsg = data.rank === 1
-        ? "🥇 YOU'RE NUMBER ONE! Top of the leaderboard — frame this moment."
-        : data.rank <= 3
-        ? `🏅 Rank #${data.rank}! Podium finish. The guidance gods smile upon you.`
-        : data.rank <= 10
-        ? `⭐ Rank #${data.rank} — Top 10! Not bad at all, hotshot.`
-        : `📋 Rank #${data.rank} — you're on the board! Every legend starts somewhere.`;
-
+      const rankMsg = pick(RANK_MESSAGES)(data.rank);
       status.textContent = `✅ Score of ${data.hof_score} submitted! ${rankMsg}`;
       status.className = 'cert-status ok';
 

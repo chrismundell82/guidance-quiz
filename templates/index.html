@@ -37,7 +37,7 @@
         <h1 class="hero-title">Guidance Notes Quiz</h1>
         <p class="hero-subtitle">Think you know your bridge guidance notes?<br>
         Time to put your engineering ego to the test.</p>
-        <p class="hero-note">Warning: may cause mild smugness or existential crisis. Side effects are your own problem.</p>
+        <p class="hero-note" id="hero-note"></p>
         <button class="btn btn-primary btn-lg" onclick="showScreen('screen-setup')">Let's Go! 🚀</button>
       </div>
     </section>
@@ -56,7 +56,7 @@
               <div class="diff-inner">
                 <div class="diff-icon">🛡️</div>
                 <div class="diff-title">Guidance Guardian</div>
-                <div class="diff-desc">The "I've skimmed the title page" tier. Easy questions for the brave but sensible.</div>
+                <div class="diff-desc" id="desc-guardian"></div>
               </div>
             </label>
 
@@ -65,7 +65,7 @@
               <div class="diff-inner">
                 <div class="diff-icon">⚔️</div>
                 <div class="diff-title">Guidance Champion</div>
-                <div class="diff-desc">You've actually opened a few guidance notes. Respect. Medium difficulty awaits.</div>
+                <div class="diff-desc" id="desc-champion"></div>
               </div>
             </label>
 
@@ -74,7 +74,7 @@
               <div class="diff-inner">
                 <div class="diff-icon">⚡</div>
                 <div class="diff-title">Guidance God</div>
-                <div class="diff-desc">You breathe guidance notes. You probably wrote some. Hard questions only. Legends only.</div>
+                <div class="diff-desc" id="desc-god"></div>
               </div>
             </label>
 
@@ -88,21 +88,21 @@
               <input type="radio" name="count" id="count-10" value="10" checked>
               <div class="count-inner">
                 <div class="count-num">10</div>
-                <div class="count-desc">Quick coffee break</div>
+                <div class="count-desc" id="count-desc-10"></div>
               </div>
             </label>
             <label class="count-card" for="count-20">
               <input type="radio" name="count" id="count-20" value="20">
               <div class="count-inner">
                 <div class="count-num">20</div>
-                <div class="count-desc">Full lunch hour</div>
+                <div class="count-desc" id="count-desc-20"></div>
               </div>
             </label>
             <label class="count-card" for="count-30">
               <input type="radio" name="count" id="count-30" value="30">
               <div class="count-inner">
                 <div class="count-num">30</div>
-                <div class="count-desc">You're either keen or procrastinating</div>
+                <div class="count-desc" id="count-desc-30"></div>
               </div>
             </label>
           </div>
@@ -119,7 +119,7 @@
     <section id="screen-loading" class="screen">
       <div class="card loading-card">
         <div class="spinner"></div>
-        <p class="loading-text">Fetching questions from the guidance note archives...<br><em>Please hold. The engineers are thinking.</em></p>
+        <p class="loading-text" id="loading-text"></p>
       </div>
     </section>
 

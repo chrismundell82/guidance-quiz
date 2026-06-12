@@ -267,17 +267,54 @@ def submit_quiz():
     total = len(questions)
     pct = round((correct_count / total) * 100) if total > 0 else 0
 
+    OUTSTANDING_MESSAGES = [
+        "Outstanding! You absolute legend. Chris Hendy himself would be proud. Consider yourself a true Guidance God in the making! 🏆",
+        "Flawless. Are you sure you haven't just memorised the answers? We're watching you. Suspiciously well done.",
+        "Top marks! The guidance notes have been read, digested, and apparently tattooed on your brain. Respect.",
+        "Extraordinary. We're legally required to inform you that this result may cause insufferable smugness at team meetings.",
+        "Perfect score territory. Your colleagues will hate you. Your bridges will love you.",
+        "That's the kind of result that gets framed. Seriously, we made a certificate. Use it.",
+        "Phenomenal. You've either studied very hard or cheated very cleverly. We choose to believe the former.",
+        "You've peaked. This is it. Retirement would be understandable at this point.",
+        "Chris Hendy has been notified. He's simultaneously proud and slightly threatened.",
+        "Outstanding performance. The guidance notes are weeping tears of joy. Finally, someone read us.",
+    ]
+    SATISFACTORY_MESSAGES = [
+        "Not bad! You clearly read the guidance notes... at least some of them. Room for improvement, but we won't report you to the bridges team. 😏",
+        "Solid effort. You're somewhere between 'reads the abstract' and 'actually reads the document'. Progress.",
+        "Respectable. Not legendary, but respectable. The bridges are cautiously optimistic about you.",
+        "You passed! Which is more than can be said for some people. You know who you are.",
+        "Decent score. You've clearly been in enough meetings where someone mentioned the guidance notes. It counts.",
+        "Not bad at all. A little more revision and you'll be insufferably confident at your next technical review.",
+        "Above average! The bar was on the floor, but you cleared it with style.",
+        "Good effort. The guidance notes appreciate being partially remembered. It's more than they usually get.",
+        "You're in the 'knows enough to be dangerous' zone. Which, frankly, is where most engineers live.",
+        "Satisfactory! A word that has never excited anyone, but here we are. Well done, sort of.",
+    ]
+    POOR_MESSAGES = [
+        "Oh dear. Have you actually read ANY guidance notes? The bridges are judging you right now. Back to the books! 📚",
+        "Yikes. The guidance notes are not angry, just deeply disappointed. There's a difference.",
+        "That score suggests a fascinating relationship with the concept of preparation. Bold strategy.",
+        "The bridges have filed a formal complaint. They expected better from you.",
+        "Chris Hendy is staring at this result in silence. That's somehow worse than shouting.",
+        "Points for bravery in submitting that. Fewer points for, well, everything else.",
+        "The guidance notes have been sitting there this whole time. Unopened, apparently. Sad.",
+        "Back to square one! Or rather, back to page one. Of the guidance notes. All of them.",
+        "We're not saying you guessed. But the statistical likelihood of this score without guessing is... interesting.",
+        "There is nowhere to go but up from here. Silver linings and all that.",
+    ]
+
     if pct >= 80:
         verdict = "outstanding"
-        message = "Outstanding! You absolute legend. Chris Hendy himself would be proud. Consider yourself a true Guidance God in the making! 🏆"
+        message = random.choice(OUTSTANDING_MESSAGES)
         image = "happy.jpg"
     elif pct >= 50:
         verdict = "satisfactory"
-        message = "Not bad! You clearly read the guidance notes... at least some of them. Room for improvement, but we won't report you to the bridges team. 😏"
+        message = random.choice(SATISFACTORY_MESSAGES)
         image = "satisfied.jpg"
     else:
         verdict = "poor"
-        message = "Oh dear. Have you actually read ANY guidance notes? The bridges are judging you right now. Back to the books! 📚"
+        message = random.choice(POOR_MESSAGES)
         image = "angry.jpg"
 
     # Calculate Hall of Fame score
@@ -411,27 +448,53 @@ def download_certificate():
     MGREY  = colors.HexColor("#666B73")
     WHITE  = colors.white
 
+    OUTSTANDING_FLAVOURS = [
+        "You absolute legend. Chris Hendy himself would shed a single proud tear.\nConsider yourself a fully certified Guidance God — the bridges bow before you.",
+        "Flawless. Suspiciously flawless. We're watching you.\nBut also celebrating you. Mostly celebrating.",
+        "Top marks. The guidance notes have never felt so appreciated.\nFrame this certificate. You've earned it.",
+        "Peak performance achieved. Your colleagues will be insufferable about this.\nSo will you. That's fine.",
+        "Outstanding. This score is going on the fridge.\nAnd the Hall of Fame. And possibly a press release.",
+    ]
+    SATISFACTORY_FLAVOURS = [
+        "You've clearly opened at least a few guidance notes in your time.\nNot bad at all — just don't let it go to your head. The bridges are watching.",
+        "Solid effort. Somewhere between 'skimmed it' and 'actually read it'.\nProgress. Slow, but progress.",
+        "Above average. The bar was low, but you cleared it.\nWith style, we might add.",
+        "Respectable score. The bridges are cautiously optimistic about you.\nDon't let them down.",
+        "Not bad! A bit more revision and you'll be dangerously overconfident.\nWhich is the goal, really.",
+    ]
+    POOR_FLAVOURS = [
+        "Oh dear. The guidance notes are disappointed in you.\nBut every legend has to start somewhere — back to the archives!",
+        "The bridges have filed a formal complaint.\nWe suggest a thorough re-read before your next attempt.",
+        "Yikes. Not angry, just deeply disappointed.\nThere is nowhere to go but up from here.",
+        "Bold performance. Very bold.\nThe guidance notes will be here when you're ready to apologise to them.",
+        "We're not saying you guessed. But statistically...\nAnyway. The archives are open. Just saying.",
+    ]
+
+    outstanding_flavour = random.choice(OUTSTANDING_FLAVOURS)
+    satisfactory_flavour = random.choice(SATISFACTORY_FLAVOURS)
+    poor_flavour = random.choice(POOR_FLAVOURS)
+
     verdict_data = {
         "outstanding": {
             "title": "*** GUIDANCE GOD TIER ***",
             "subtitle": "Outstanding Performance",
             "colour": colors.HexColor("#B9FF00"),
             "text_colour": colors.HexColor("#3a6600"),
-            "flavour": "You absolute legend. Chris Hendy himself would shed a single proud tear.\nConsider yourself a fully certified Guidance God — the bridges bow before you."
+            "flavour": outstanding_flavour
         },
         "satisfactory": {
             "title": "ADEQUATELY GUIDED",
             "subtitle": "Satisfactory Performance",
             "colour": colors.HexColor("#3F32F1"),
             "text_colour": colors.HexColor("#3F32F1"),
-            "flavour": "You've clearly opened at least a few guidance notes in your time.\nNot bad at all — just don't let it go to your head. The bridges are watching."
+            "flavour": satisfactory_flavour
         },
         "poor": {
             "title": "GUIDANCE NOTE APPRENTICE",
             "subtitle": "Needs Improvement",
             "colour": colors.HexColor("#c0392b"),
             "text_colour": colors.HexColor("#c0392b"),
-            "flavour": "Oh dear. The guidance notes are disappointed in you.\nBut every legend has to start somewhere — back to the archives!"
+            "flavour": poor_flavour
         }
     }
     vd = verdict_data.get(result["verdict"], verdict_data["satisfactory"])
