@@ -24,6 +24,7 @@ function showScreen(id) {
 
 
 
+async function startQuiz() {
   const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
   const count = parseInt(document.querySelector('input[name="count"]:checked').value);
 
