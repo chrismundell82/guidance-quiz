@@ -513,3 +513,29 @@ body {
   .hof-table { font-size: 13px; }
   .hof-table td, .hof-table th { padding: 8px 8px; }
 }
+
+/* ---- SHARED NAME BLOCK ---- */
+.name-block {
+  margin: 20px 0 12px;
+}
+.name-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dark);
+  margin-bottom: 8px;
+}
+
+/* ---- ACTIONS BLOCK ---- */
+.actions-block {
+  border: 2px solid var(--grey-light);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 20px 0;
+  background: var(--grey-bg);
+}
+.actions-block .name-block { margin-bottom: 16px; }
+.actions-block .hof-submit-block { margin-bottom: 12px; }
+.actions-block .cert-block { margin-bottom: 0; }
+.hof-submit-block .btn:disabled,
+.cert-block .btn:disabled { opacity: 0.4; cursor: not-allowed; }

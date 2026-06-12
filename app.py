@@ -42,7 +42,22 @@ def init_db():
                         submitted_at TEXT NOT NULL
                     )
                 """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS questions (
+                        id SERIAL PRIMARY KEY,
+                        difficulty TEXT NOT NULL,
+                        ref TEXT,
+                        question TEXT NOT NULL,
+                        option_a TEXT NOT NULL,
+                        option_b TEXT NOT NULL,
+                        option_c TEXT,
+                        option_d TEXT,
+                        correct_answer CHAR(1) NOT NULL
+                    )
+                """)
             conn.commit()
+        # Seed from Excel if table is empty
+        migrate_from_excel()
     except Exception as e:
         print(f"DB init warning: {e}")
 
@@ -75,7 +90,82 @@ DIFFICULTY_LABELS = {
 }
 
 
+def migrate_from_excel():
+    """Import questions from Excel into DB if questions table is empty."""
+    if not DB_URL or not os.path.exists(EXCEL_PATH):
+        return
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM questions")
+                if cur.fetchone()["count"] > 0:
+                    return  # Already seeded
+            
+            df = pd.read_excel(EXCEL_PATH, sheet_name="Questions")
+            df.columns = df.columns.str.strip()
+            
+            with conn.cursor() as cur:
+                for _, row in df.iterrows():
+                    question_text = str(row.get("Question", "")).strip()
+                    if not question_text or question_text == "nan":
+                        continue
+                    
+                    difficulty_raw = str(row.get("Difficulty", "")).strip()
+                    diff_key = {v: k for k, v in DIFFICULTY_MAP.items()}.get(difficulty_raw, "guardian")
+                    
+                    answer_raw = str(row.get("Answer", "A")).strip()
+                    correct = answer_raw[0].upper() if answer_raw else "A"
+                    
+                    cur.execute("""
+                        INSERT INTO questions (difficulty, ref, question, option_a, option_b, option_c, option_d, correct_answer)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        diff_key,
+                        str(row.get("Ref", "")).strip(),
+                        question_text,
+                        str(row.get("A", "")).strip(),
+                        str(row.get("B", "")).strip(),
+                        str(row.get("C", "")).strip() or None,
+                        str(row.get("D", "")).strip() or None,
+                        correct
+                    ))
+            conn.commit()
+            print(f"Migrated questions from Excel to DB")
+    except Exception as e:
+        print(f"Migration warning: {e}")
+
+
 def load_questions(difficulty_key):
+    # Try DB first, fall back to Excel
+    if DB_URL:
+        try:
+            with get_db() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT * FROM questions WHERE difficulty = %s
+                    """, (difficulty_key,))
+                    rows = cur.fetchall()
+            
+            questions = []
+            for row in rows:
+                options = [{"key": "A", "text": row["option_a"]},
+                           {"key": "B", "text": row["option_b"]}]
+                if row["option_c"]:
+                    options.append({"key": "C", "text": row["option_c"]})
+                if row["option_d"]:
+                    options.append({"key": "D", "text": row["option_d"]})
+                questions.append({
+                    "question": row["question"],
+                    "options": options,
+                    "correct": row["correct_answer"],
+                    "ref": row["ref"] or "",
+                    "id": row["id"]
+                })
+            return questions
+        except Exception as e:
+            print(f"DB load_questions error: {e}")
+
+    # Fallback: Excel
     df = pd.read_excel(EXCEL_PATH, sheet_name="Questions")
     df.columns = df.columns.str.strip()
     difficulty_name = DIFFICULTY_MAP[difficulty_key]
@@ -88,23 +178,19 @@ def load_questions(difficulty_key):
             val = row.get(col)
             if pd.notna(val) and str(val).strip():
                 options.append({"key": col, "text": str(val).strip()})
-
         answer_raw = str(row.get("Answer", "")).strip()
-        # Answer is like "A - True" or "B - False..." — extract just the letter
         correct_letter = answer_raw[0] if answer_raw else "A"
-
         question_text = str(row.get("Question", "")).strip()
         if not question_text or not options:
             continue
-
         questions.append({
             "question": question_text,
             "options": options,
             "correct": correct_letter,
             "ref": str(row.get("Ref", ""))
         })
-
     return questions
+
 
 
 @app.route("/")
@@ -438,9 +524,9 @@ def download_certificate():
     }
     img_path = os.path.join(os.path.dirname(__file__), "static", "images", result["image"])
     if os.path.exists(img_path):
-        img_size = 28*mm
+        img_size = 52*mm
         img_x = W/2 - img_size/2
-        img_y = box_y - 58*mm
+        img_y = box_y - 72*mm
         c.drawImage(img_path, img_x, img_y, width=img_size, height=img_size,
                     preserveAspectRatio=True, mask="auto")
 
@@ -467,6 +553,131 @@ def download_certificate():
         as_attachment=True,
         download_name=filename
     )
+
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+
+
+def admin_required():
+    return session.get("admin_logged_in") is True
+
+
+@app.route("/admin")
+def admin():
+    if not admin_required():
+        return render_template("admin_login.html")
+    return render_template("admin.html")
+
+
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+    if request.form.get("password") == ADMIN_PASSWORD:
+        session["admin_logged_in"] = True
+        return redirect_to_admin()
+    return render_template("admin_login.html", error="Wrong password. Nice try.")
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_logged_in", None)
+    from flask import redirect, url_for
+    return redirect(url_for("admin"))
+
+
+def redirect_to_admin():
+    from flask import redirect, url_for
+    return redirect(url_for("admin"))
+
+
+@app.route("/api/admin/questions", methods=["GET"])
+def admin_get_questions():
+    if not admin_required():
+        return jsonify({"error": "Unauthorised"}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM questions ORDER BY difficulty, id")
+                rows = cur.fetchall()
+        return jsonify({"questions": [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/questions", methods=["POST"])
+def admin_add_question():
+    if not admin_required():
+        return jsonify({"error": "Unauthorised"}), 401
+    data = request.json
+    required = ["difficulty", "question", "option_a", "option_b", "correct_answer"]
+    for f in required:
+        if not data.get(f, "").strip():
+            return jsonify({"error": f"Field '{f}' is required"}), 400
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO questions (difficulty, ref, question, option_a, option_b, option_c, option_d, correct_answer)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    data["difficulty"].strip(),
+                    data.get("ref", "").strip() or None,
+                    data["question"].strip(),
+                    data["option_a"].strip(),
+                    data["option_b"].strip(),
+                    data.get("option_c", "").strip() or None,
+                    data.get("option_d", "").strip() or None,
+                    data["correct_answer"].strip()[0].upper()
+                ))
+                new_id = cur.fetchone()["id"]
+            conn.commit()
+        return jsonify({"success": True, "id": new_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/questions/<int:qid>", methods=["PUT"])
+def admin_update_question(qid):
+    if not admin_required():
+        return jsonify({"error": "Unauthorised"}), 401
+    data = request.json
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE questions SET
+                        difficulty = %s, ref = %s, question = %s,
+                        option_a = %s, option_b = %s, option_c = %s,
+                        option_d = %s, correct_answer = %s
+                    WHERE id = %s
+                """, (
+                    data["difficulty"].strip(),
+                    data.get("ref", "").strip() or None,
+                    data["question"].strip(),
+                    data["option_a"].strip(),
+                    data["option_b"].strip(),
+                    data.get("option_c", "").strip() or None,
+                    data.get("option_d", "").strip() or None,
+                    data["correct_answer"].strip()[0].upper(),
+                    qid
+                ))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/questions/<int:qid>", methods=["DELETE"])
+def admin_delete_question(qid):
+    if not admin_required():
+        return jsonify({"error": "Unauthorised"}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM questions WHERE id = %s", (qid,))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

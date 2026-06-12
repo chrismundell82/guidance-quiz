@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Question Manager — Guidance Quiz</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f4f7; color: #192D38; }
+
+    .topbar {
+      background: #192D38; color: #fff; padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar h1 { font-size: 17px; font-weight: 700; }
+    .topbar-right { display: flex; gap: 10px; align-items: center; }
+    .topbar a { color: #C4DCE7; font-size: 13px; text-decoration: none; }
+    .topbar a:hover { color: #fff; }
+
+    .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+
+    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card {
+      background: #fff; border-radius: 8px; padding: 14px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex: 1; min-width: 120px; text-align: center;
+    }
+    .stat-num { font-size: 28px; font-weight: 700; color: #3F32F1; }
+    .stat-label { font-size: 12px; color: #666; margin-top: 2px; }
+
+    .toolbar {
+      display: flex; gap: 10px; align-items: center;
+      margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .toolbar select, .toolbar input {
+      padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: 14px; background: #fff;
+    }
+    .toolbar input { flex: 1; min-width: 180px; }
+
+    .btn { padding: 9px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #192D38; color: #fff; }
+    .btn-primary:hover { background: #243d4d; }
+    .btn-success { background: #1a7f4b; color: #fff; }
+    .btn-success:hover { background: #166040; }
+    .btn-danger { background: #c0392b; color: #fff; font-size: 12px; padding: 5px 10px; }
+    .btn-danger:hover { background: #a93226; }
+    .btn-edit { background: #3F32F1; color: #fff; font-size: 12px; padding: 5px 10px; }
+    .btn-edit:hover { background: #5548f3; }
+    .btn-sm { font-size: 12px; padding: 5px 10px; }
+
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    thead { background: #192D38; color: #fff; }
+    th { padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8f9ff; }
+
+    .diff-badge {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+    }
+    .diff-guardian { background: #e8f0fe; color: #1a56db; }
+    .diff-champion { background: #f3e8ff; color: #7e22ce; }
+    .diff-god      { background: #fef9c3; color: #854d0e; }
+
+    .q-text { max-width: 320px; }
+    .options-cell { font-size: 12px; color: #555; line-height: 1.6; }
+    .correct-opt { font-weight: 700; color: #1a7f4b; }
+    .actions-cell { white-space: nowrap; display: flex; gap: 6px; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 10px; padding: 28px 24px;
+      width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .modal h3 { font-size: 17px; color: #192D38; margin-bottom: 20px; }
+    .form-row { margin-bottom: 14px; }
+    .form-row label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 5px; }
+    .form-row input, .form-row select, .form-row textarea {
+      width: 100%; padding: 9px 12px; border: 1.5px solid #ddd;
+      border-radius: 6px; font-size: 14px; font-family: Arial, sans-serif;
+    }
+    .form-row textarea { resize: vertical; min-height: 80px; }
+    .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+      outline: none; border-color: #3F32F1;
+    }
+    .form-row .hint { font-size: 11px; color: #888; margin-top: 3px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn-cancel { background: #eee; color: #333; }
+    .btn-cancel:hover { background: #ddd; }
+
+    .status-bar {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #192D38; color: #fff; padding: 10px 18px;
+      border-radius: 8px; font-size: 14px; font-weight: 600;
+      display: none; z-index: 300; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    .status-bar.ok { background: #1a7f4b; }
+    .status-bar.err { background: #c0392b; }
+    .status-bar.show { display: block; }
+
+    #empty-msg { text-align: center; padding: 40px; color: #888; display: none; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⚙️ Guidance Quiz — Question Manager</h1>
+  <div class="topbar-right">
+    <a href="/">← Back to Quiz</a>
+    <a href="/admin/logout">Logout</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Questions</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-guardian">—</div><div class="stat-label">Guardian</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-champion">—</div><div class="stat-label">Champion</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-god">—</div><div class="stat-label">God</div></div>
+  </div>
+
+  <div class="toolbar">
+    <select id="filter-diff" onchange="applyFilter()">
+      <option value="">All difficulties</option>
+      <option value="guardian">Guardian</option>
+      <option value="champion">Champion</option>
+      <option value="god">God</option>
+    </select>
+    <input type="text" id="filter-search" placeholder="Search questions..." oninput="applyFilter()" />
+    <button class="btn btn-success" onclick="openAddModal()">+ Add Question</button>
+  </div>
+
+  <table id="q-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Difficulty</th>
+        <th>Ref</th>
+        <th>Question</th>
+        <th>Options</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="q-tbody"></tbody>
+  </table>
+  <div id="empty-msg">No questions match your filter.</div>
+
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Add Question</h3>
+    <input type="hidden" id="edit-id" value="" />
+
+    <div class="form-row">
+      <label>Difficulty *</label>
+      <select id="f-difficulty">
+        <option value="guardian">Guidance Guardian</option>
+        <option value="champion">Guidance Champion</option>
+        <option value="god">Guidance God</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Reference</label>
+      <input type="text" id="f-ref" placeholder="e.g. GN-001" />
+    </div>
+    <div class="form-row">
+      <label>Question *</label>
+      <textarea id="f-question" placeholder="Enter the question text..."></textarea>
+    </div>
+    <div class="form-row">
+      <label>Option A *</label>
+      <input type="text" id="f-option-a" placeholder="Option A" />
+    </div>
+    <div class="form-row">
+      <label>Option B *</label>
+      <input type="text" id="f-option-b" placeholder="Option B" />
+    </div>
+    <div class="form-row">
+      <label>Option C</label>
+      <input type="text" id="f-option-c" placeholder="Option C (optional)" />
+    </div>
+    <div class="form-row">
+      <label>Option D</label>
+      <input type="text" id="f-option-d" placeholder="Option D (optional)" />
+    </div>
+    <div class="form-row">
+      <label>Correct Answer *</label>
+      <select id="f-correct">
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+        <option value="D">D</option>
+      </select>
+      <div class="hint">Select the letter of the correct option above</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" onclick="saveQuestion()">Save Question</button>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar" id="status-bar"></div>
+
+<script>
+  let allQuestions = [];
+
+  async function loadQuestions() {
+    const res = await fetch('/api/admin/questions');
+    const data = await res.json();
+    allQuestions = data.questions || [];
+    updateStats();
+    renderTable(allQuestions);
+  }
+
+  function updateStats() {
+    document.getElementById('stat-total').textContent = allQuestions.length;
+    document.getElementById('stat-guardian').textContent = allQuestions.filter(q => q.difficulty === 'guardian').length;
+    document.getElementById('stat-champion').textContent = allQuestions.filter(q => q.difficulty === 'champion').length;
+    document.getElementById('stat-god').textContent = allQuestions.filter(q => q.difficulty === 'god').length;
+  }
+
+  function applyFilter() {
+    const diff = document.getElementById('filter-diff').value;
+    const search = document.getElementById('filter-search').value.toLowerCase();
+    let filtered = allQuestions;
+    if (diff) filtered = filtered.filter(q => q.difficulty === diff);
+    if (search) filtered = filtered.filter(q => q.question.toLowerCase().includes(search) || (q.ref || '').toLowerCase().includes(search));
+    renderTable(filtered);
+  }
+
+  function renderTable(questions) {
+    const tbody = document.getElementById('q-tbody');
+    const emptyMsg = document.getElementById('empty-msg');
+    tbody.innerHTML = '';
+
+    if (!questions.length) {
+      emptyMsg.style.display = 'block';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    questions.forEach((q, i) => {
+      const diffClass = `diff-${q.difficulty}`;
+      const diffLabel = { guardian: 'Guardian', champion: 'Champion', god: 'God' }[q.difficulty] || q.difficulty;
+
+      const opts = ['A','B','C','D'].map(l => {
+        const val = q[`option_${l.toLowerCase()}`];
+        if (!val) return '';
+        const cls = q.correct_answer === l ? 'correct-opt' : '';
+        return `<span class="${cls}">${l}: ${escHtml(val)}</span>`;
+      }).filter(Boolean).join('<br>');
+
+      tbody.innerHTML += `
+        <tr data-id="${q.id}">
+          <td style="color:#999;font-size:12px;">${q.id}</td>
+          <td><span class="diff-badge ${diffClass}">${diffLabel}</span></td>
+          <td style="font-size:12px;color:#888;">${escHtml(q.ref || '')}</td>
+          <td class="q-text">${escHtml(q.question)}</td>
+          <td class="options-cell">${opts}</td>
+          <td><div class="actions-cell">
+            <button class="btn btn-edit btn-sm" onclick="openEditModal(${q.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">Delete</button>
+          </div></td>
+        </tr>`;
+    });
+  }
+
+  function openAddModal() {
+    document.getElementById('modal-title').textContent = 'Add Question';
+    document.getElementById('edit-id').value = '';
+    document.getElementById('f-difficulty').value = 'guardian';
+    document.getElementById('f-ref').value = '';
+    document.getElementById('f-question').value = '';
+    document.getElementById('f-option-a').value = '';
+    document.getElementById('f-option-b').value = '';
+    document.getElementById('f-option-c').value = '';
+    document.getElementById('f-option-d').value = '';
+    document.getElementById('f-correct').value = 'A';
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function openEditModal(id) {
+    const q = allQuestions.find(q => q.id === id);
+    if (!q) return;
+    document.getElementById('modal-title').textContent = 'Edit Question';
+    document.getElementById('edit-id').value = id;
+    document.getElementById('f-difficulty').value = q.difficulty;
+    document.getElementById('f-ref').value = q.ref || '';
+    document.getElementById('f-question').value = q.question;
+    document.getElementById('f-option-a').value = q.option_a || '';
+    document.getElementById('f-option-b').value = q.option_b || '';
+    document.getElementById('f-option-c').value = q.option_c || '';
+    document.getElementById('f-option-d').value = q.option_d || '';
+    document.getElementById('f-correct').value = q.correct_answer;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  async function saveQuestion() {
+    const id = document.getElementById('edit-id').value;
+    const payload = {
+      difficulty: document.getElementById('f-difficulty').value,
+      ref: document.getElementById('f-ref').value,
+      question: document.getElementById('f-question').value,
+      option_a: document.getElementById('f-option-a').value,
+      option_b: document.getElementById('f-option-b').value,
+      option_c: document.getElementById('f-option-c').value,
+      option_d: document.getElementById('f-option-d').value,
+      correct_answer: document.getElementById('f-correct').value,
+    };
+
+    if (!payload.question.trim() || !payload.option_a.trim() || !payload.option_b.trim()) {
+      showStatus('Please fill in the question and at least options A and B.', 'err');
+      return;
+    }
+
+    const url = id ? `/api/admin/questions/${id}` : '/api/admin/questions';
+    const method = id ? 'PUT' : 'POST';
+
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+
+    if (data.success || data.id) {
+      closeModal();
+      showStatus(id ? 'Question updated!' : 'Question added!', 'ok');
+      await loadQuestions();
+    } else {
+      showStatus(data.error || 'Error saving question', 'err');
+    }
+  }
+
+  async function deleteQuestion(id) {
+    const q = allQuestions.find(q => q.id === id);
+    if (!confirm(`Delete this question?\n\n"${q ? q.question.substring(0, 80) : id}..."\n\nThis cannot be undone.`)) return;
+
+    const res = await fetch(`/api/admin/questions/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showStatus('Question deleted.', 'ok');
+      await loadQuestions();
+    } else {
+      showStatus(data.error || 'Error deleting', 'err');
+    }
+  }
+
+  function showStatus(msg, type) {
+    const bar = document.getElementById('status-bar');
+    bar.textContent = msg;
+    bar.className = `status-bar ${type} show`;
+    setTimeout(() => bar.classList.remove('show'), 3000);
+  }
+
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Close modal on overlay click
+  document.getElementById('modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  loadQuestions();
+</script>
+
+</body>
+</html>
