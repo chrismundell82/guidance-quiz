@@ -22,7 +22,11 @@ function showScreen(id) {
   }
 }
 
-async function startQuiz() {
+function onNameInput() {
+  // reserved for future use
+}
+
+
   const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
   const count = parseInt(document.querySelector('input[name="count"]:checked').value);
 
@@ -251,7 +255,7 @@ function launchFireworks(verdict) {
 }
 
 async function downloadCertificate() {
-  const name = document.getElementById('cert-name').value.trim();
+  const name = document.getElementById('shared-name').value.trim();
   const status = document.getElementById('cert-status');
 
   if (!name) {
@@ -382,7 +386,7 @@ async function loadHoF() {
 }
 
 async function submitToHoF() {
-  const name = document.getElementById('hof-name').value.trim();
+  const name = document.getElementById('shared-name').value.trim();
   const status = document.getElementById('hof-submit-status');
 
   if (!name) {
@@ -415,8 +419,8 @@ async function submitToHoF() {
       status.className = 'cert-status ok';
 
       // Disable the button to prevent double submission
-      document.querySelector('.hof-submit-block .btn').disabled = true;
-      document.querySelector('.hof-submit-block .btn').textContent = '✅ Submitted!';
+      const hofBtn = document.getElementById('btn-hof-submit');
+      if (hofBtn) { hofBtn.disabled = true; hofBtn.textContent = '✅ Submitted!'; }
     } else {
       status.textContent = `❌ ${data.error}`;
       status.className = 'cert-status err';
