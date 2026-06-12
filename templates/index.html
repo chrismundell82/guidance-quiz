@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>AtkinsRéalis Guidance Notes Quiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Condensed:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-logo">
+        <svg width="140" height="36" viewBox="0 0 140 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="26" font-family="Roboto Condensed, sans-serif" font-weight="700" font-size="22" fill="#ffffff">Atkins</text>
+          <text x="67" y="26" font-family="Roboto Condensed, sans-serif" font-weight="300" font-size="22" fill="#ffffff">Réalis</text>
+        </svg>
+      </div>
+      <div class="header-tagline">Bridges &amp; Structures · Guidance Notes Quiz</div>
+    </div>
+  </header>
+
+  <!-- SCREENS -->
+  <main class="main">
+
+    <!-- SCREEN 1: Welcome -->
+    <section id="screen-welcome" class="screen active">
+      <div class="card hero-card">
+        <div class="hero-badge">⚙️ OFFICIAL(ISH)</div>
+        <h1 class="hero-title">Guidance Notes Quiz</h1>
+        <p class="hero-subtitle">Think you know your bridge guidance notes?<br>
+        Time to put your engineering ego to the test.</p>
+        <p class="hero-note">Warning: may cause mild smugness or existential crisis. Side effects are your own problem.</p>
+        <button class="btn btn-primary btn-lg" onclick="showScreen('screen-setup')">Let's Go! 🚀</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: Setup -->
+    <section id="screen-setup" class="screen">
+      <div class="card">
+        <h2 class="section-title">Choose Your Destiny</h2>
+
+        <div class="setup-block">
+          <h3 class="setup-label">How brave are you feeling? 🦁</h3>
+          <div class="difficulty-grid">
+
+            <label class="diff-card" for="diff-guardian">
+              <input type="radio" name="difficulty" id="diff-guardian" value="guardian" checked>
+              <div class="diff-inner">
+                <div class="diff-icon">🛡️</div>
+                <div class="diff-title">Guidance Guardian</div>
+                <div class="diff-desc">The "I've skimmed the title page" tier. Easy questions for the brave but sensible.</div>
+              </div>
+            </label>
+
+            <label class="diff-card" for="diff-champion">
+              <input type="radio" name="difficulty" id="diff-champion" value="champion">
+              <div class="diff-inner">
+                <div class="diff-icon">⚔️</div>
+                <div class="diff-title">Guidance Champion</div>
+                <div class="diff-desc">You've actually opened a few guidance notes. Respect. Medium difficulty awaits.</div>
+              </div>
+            </label>
+
+            <label class="diff-card" for="diff-god">
+              <input type="radio" name="difficulty" id="diff-god" value="god">
+              <div class="diff-inner">
+                <div class="diff-icon">⚡</div>
+                <div class="diff-title">Guidance God</div>
+                <div class="diff-desc">You breathe guidance notes. You probably wrote some. Hard questions only. Legends only.</div>
+              </div>
+            </label>
+
+          </div>
+        </div>
+
+        <div class="setup-block">
+          <h3 class="setup-label">How many questions? (How much pain do you want?)</h3>
+          <div class="count-grid">
+            <label class="count-card" for="count-10">
+              <input type="radio" name="count" id="count-10" value="10" checked>
+              <div class="count-inner">
+                <div class="count-num">10</div>
+                <div class="count-desc">Quick coffee break</div>
+              </div>
+            </label>
+            <label class="count-card" for="count-20">
+              <input type="radio" name="count" id="count-20" value="20">
+              <div class="count-inner">
+                <div class="count-num">20</div>
+                <div class="count-desc">Full lunch hour</div>
+              </div>
+            </label>
+            <label class="count-card" for="count-30">
+              <input type="radio" name="count" id="count-30" value="30">
+              <div class="count-inner">
+                <div class="count-num">30</div>
+                <div class="count-desc">You're either keen or procrastinating</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="setup-actions">
+          <button class="btn btn-outline" onclick="showScreen('screen-welcome')">← Back</button>
+          <button class="btn btn-primary" onclick="startQuiz()">Start Quiz →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: Loading -->
+    <section id="screen-loading" class="screen">
+      <div class="card loading-card">
+        <div class="spinner"></div>
+        <p class="loading-text">Fetching questions from the guidance note archives...<br><em>Please hold. The engineers are thinking.</em></p>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: Quiz -->
+    <section id="screen-quiz" class="screen">
+      <div class="quiz-header">
+        <div class="quiz-progress-text">
+          Question <span id="q-current">1</span> of <span id="q-total">10</span>
+        </div>
+        <div class="quiz-difficulty-badge" id="quiz-diff-badge"></div>
+      </div>
+      <div class="quiz-progress-bar">
+        <div class="quiz-progress-fill" id="progress-fill"></div>
+      </div>
+
+      <div class="card quiz-card" id="quiz-card">
+        <div class="question-number" id="question-label">Question 1</div>
+        <h2 class="question-text" id="question-text"></h2>
+        <div class="options-list" id="options-list"></div>
+      </div>
+
+      <div class="quiz-nav">
+        <button class="btn btn-outline" id="btn-prev" onclick="prevQuestion()" disabled>← Previous</button>
+        <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()">Next →</button>
+        <button class="btn btn-accent" id="btn-submit" onclick="submitQuiz()" style="display:none">Submit Quiz 🎯</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 5: Results -->
+    <section id="screen-results" class="screen">
+      <div id="fireworks-container"></div>
+      <div class="results-card card" id="results-card">
+        <div class="results-badge" id="results-badge"></div>
+        <img class="results-image" id="results-image" src="" alt="Result" />
+        <h2 class="results-title" id="results-title"></h2>
+        <div class="results-score" id="results-score"></div>
+        <p class="results-message" id="results-message"></p>
+
+        <div class="results-breakdown" id="results-breakdown"></div>
+
+        <div class="cert-block">
+          <h3 class="cert-title">🏅 Claim Your Certificate</h3>
+          <p class="cert-desc">We'll email you an official(ish) certificate. Not recognised by any professional body. Still fun.</p>
+          <div class="cert-form">
+            <input type="text" id="cert-name" class="cert-input" placeholder="Your name (for bragging rights)" />
+            <input type="email" id="cert-email" class="cert-input" placeholder="your.email@atkinsrealis.com" />
+            <button class="btn btn-primary" onclick="sendCertificate()">Send My Certificate 📧</button>
+          </div>
+          <div id="cert-status" class="cert-status"></div>
+        </div>
+
+        <div class="results-actions">
+          <button class="btn btn-outline" onclick="retakeQuiz()">Retake Quiz 🔄</button>
+          <button class="btn btn-primary" onclick="showScreen('screen-welcome')">Home 🏠</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>AtkinsRéalis Bridges &amp; Structures · Guidance Notes Quiz · For internal use and entertainment purposes 😄</p>
+  </footer>
+
+  <script src="/static/js/quiz.js"></script>
+</body>
+</html>
