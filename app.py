@@ -232,15 +232,18 @@ def send_certificate():
 
     try:
         with urllib.request.urlopen(req) as resp:
+            body = resp.read().decode("utf-8", errors="ignore")
             if resp.status in (200, 201, 202):
-                return jsonify({"success": True})
+                return jsonify({"success": True, "detail": body})
             else:
-                return jsonify({"error": f"Resend returned status {resp.status}"}), 500
+                return jsonify({"error": f"Resend status {resp.status}: {body}"}), 500
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="ignore")
-        return jsonify({"error": f"Resend error {e.code}: {body}"}), 500
+        return jsonify({"error": f"Resend HTTP {e.code}: {body}"}), 500
+    except urllib.error.URLError as e:
+        return jsonify({"error": f"Network error: {str(e.reason)}"}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Unexpected: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
