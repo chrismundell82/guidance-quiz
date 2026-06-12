@@ -224,13 +224,13 @@ def send_certificate():
 
     try:
         with urllib.request.urlopen(req) as resp:
-            if resp.status in (200, 202):
+            if resp.status in (200, 201, 202):
                 return jsonify({"success": True})
             else:
-                return jsonify({"error": f"SendGrid returned {resp.status}"}), 500
+                return jsonify({"error": f"Resend returned status {resp.status}"}), 500
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="ignore")
-        return jsonify({"error": f"SendGrid error {e.code}: {body}"}), 500
+        return jsonify({"error": f"Resend error {e.code}: {body}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
