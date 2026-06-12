@@ -154,6 +154,14 @@ def submit_quiz():
 
 
 
+@app.route("/debug-email")
+def debug_email():
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if not resend_key:
+        return "RESEND_API_KEY is NOT set in environment variables"
+    return f"RESEND_API_KEY is set — starts with: {resend_key[:8]}... length: {len(resend_key)}"
+
+
 @app.route("/api/send-certificate", methods=["POST"])
 def send_certificate():
     data = request.json
