@@ -1,11 +1,8 @@
 import os
 import random
 import json
-import smtplib
-import base64
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
+import urllib.request
+import urllib.error
 from flask import Flask, render_template, request, jsonify, session
 import pandas as pd
 
@@ -154,6 +151,9 @@ def submit_quiz():
     })
 
 
+
+
+
 @app.route("/api/send-certificate", methods=["POST"])
 def send_certificate():
     data = request.json
@@ -164,62 +164,73 @@ def send_certificate():
     if not result or not email:
         return jsonify({"error": "Missing data"}), 400
 
-    smtp_host = os.environ.get("SMTP_HOST", "")
-    smtp_port = int(os.environ.get("SMTP_PORT", 587))
-    smtp_user = os.environ.get("SMTP_USER", "")
-    smtp_pass = os.environ.get("SMTP_PASS", "")
-    from_email = os.environ.get("FROM_EMAIL", smtp_user)
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    from_email = os.environ.get("FROM_EMAIL", "onboarding@resend.dev")
 
-    if not smtp_host or not smtp_user:
+    if not resend_key:
         return jsonify({"error": "Email not configured on server"}), 500
 
-    # Build HTML email
-    verdict_phrases = {
-        "outstanding": "a certified Guidance God",
-        "satisfactory": "showing satisfactory guidance awareness",
-        "poor": "in urgent need of guidance note revision"
+    verdict_titles = {
+        "outstanding": "🏆 Guidance God Tier",
+        "satisfactory": "👍 Adequately Guided",
+        "poor": "📚 Guidance Note Apprentice"
     }
-    phrase = verdict_phrases.get(result["verdict"], "")
+    title = verdict_titles.get(result["verdict"], "Quiz Complete")
 
     html_body = f"""
-    <html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #f5f5f5; padding: 20px;">
-      <div style="background: #002147; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-        <h1 style="color: #fff; font-size: 22px; margin: 0;">AtkinsRéalis Guidance Notes Quiz</h1>
-        <p style="color: #ccc; margin: 5px 0 0;">Official(ish) Certificate of Achievement</p>
+    <html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #f4f6f9; padding: 20px;">
+      <div style="background: #002147; padding: 24px 28px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 1px;">AtkinsRéalis</h1>
+        <p style="color: rgba(255,255,255,0.7); margin: 6px 0 0; font-size: 13px;">Bridges &amp; Structures · Guidance Notes Quiz</p>
       </div>
-      <div style="background: #fff; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #ddd;">
-        <h2 style="color: #002147;">Dear {name},</h2>
-        <p style="font-size: 16px;">This is to certify that you completed the <strong>{result['difficulty']}</strong> level quiz and scored:</p>
-        <div style="text-align: center; background: #f0f4f8; border-radius: 8px; padding: 20px; margin: 20px 0;">
-          <span style="font-size: 48px; font-weight: bold; color: #002147;">{result['pct']}%</span>
-          <p style="font-size: 18px; color: #555; margin: 5px 0;">{result['score']} out of {result['total']} correct</p>
-        </div>
-        <p style="font-size: 16px; color: #444;">{result['message']}</p>
-        <p style="font-size: 14px; color: #888; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
-          AtkinsRéalis Bridges & Structures Guidance Team<br>
-          <em>This certificate carries absolutely no professional accreditation whatsoever. But we think it looks nice.</em>
+      <div style="background: #ffffff; padding: 32px 28px; border-radius: 0 0 10px 10px; border: 1px solid #e0e4ea; border-top: none;">
+        <p style="font-size: 13px; color: #E4002B; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin: 0 0 10px;">{title}</p>
+        <h2 style="color: #002147; font-size: 22px; margin: 0 0 20px;">Dear {name},</h2>
+        <p style="font-size: 15px; color: #444; line-height: 1.6;">
+          This is to certify that you completed the <strong>{result['difficulty']}</strong> level quiz with the following result:
         </p>
+        <div style="text-align: center; background: #f0f4f8; border-radius: 10px; padding: 24px; margin: 24px 0;">
+          <div style="font-size: 60px; font-weight: 700; color: #002147; line-height: 1;">{result['pct']}%</div>
+          <div style="font-size: 17px; color: #555; margin-top: 8px;">{result['score']} out of {result['total']} correct</div>
+        </div>
+        <p style="font-size: 15px; color: #444; line-height: 1.6; font-style: italic;">"{result['message']}"</p>
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #eee;">
+          <p style="font-size: 13px; color: #999; line-height: 1.6; margin: 0;">
+            AtkinsRéalis Bridges &amp; Structures Guidance Team<br>
+            <em>This certificate carries absolutely no professional accreditation whatsoever.<br>
+            But it does prove you had 10 minutes to spare, which is something.</em>
+          </p>
+        </div>
       </div>
     </body></html>
     """
 
+    payload = json.dumps({
+        "from": "AtkinsRéalis Guidance Quiz <onboarding@resend.dev>",
+        "to": [email],
+        "subject": f"Your Guidance Notes Quiz Certificate — {result['pct']}% ({result['difficulty']})",
+        "html": html_body
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {resend_key}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+
     try:
-        msg = MIMEMultipart("related")
-        msg["Subject"] = f"Your AtkinsRéalis Guidance Quiz Certificate — {result['pct']}%!"
-        msg["From"] = from_email
-        msg["To"] = email
-
-        msg_alt = MIMEMultipart("alternative")
-        msg.attach(msg_alt)
-        msg_alt.attach(MIMEText(html_body, "html"))
-
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(from_email, email, msg.as_string())
-        server.quit()
-
-        return jsonify({"success": True})
+        with urllib.request.urlopen(req) as resp:
+            if resp.status in (200, 202):
+                return jsonify({"success": True})
+            else:
+                return jsonify({"error": f"SendGrid returned {resp.status}"}), 500
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="ignore")
+        return jsonify({"error": f"SendGrid error {e.code}: {body}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
