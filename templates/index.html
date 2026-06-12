@@ -154,25 +154,27 @@
 
         <div class="results-breakdown" id="results-breakdown"></div>
 
-        <div class="hof-submit-block">
-          <h3 class="cert-title">🏆 Submit to Hall of Fame</h3>
-          <p class="cert-desc">Think your score deserves immortality? Submit it to the leaderboard.<br>
-          Your <strong id="hof-score-preview"></strong> Hall of Fame score will be ranked against all other engineers.</p>
-          <div class="cert-form">
-            <input type="text" id="hof-name" class="cert-input" placeholder="Your name (choose wisely, it's permanent)" maxlength="50" />
-            <button class="btn btn-accent" onclick="submitToHoF()">Submit to Hall of Fame 🚀</button>
+        <!-- Combined name + actions block -->
+        <div class="actions-block">
+          <div class="name-block">
+            <label class="name-label">Your name <span style="font-weight:400;color:var(--grey-text)">(used for Hall of Fame &amp; certificate)</span></label>
+            <input type="text" id="shared-name" class="cert-input" placeholder="e.g. Chris Hendy, God of Engineering" maxlength="50" oninput="onNameInput()" />
           </div>
-          <div id="hof-submit-status" class="cert-status"></div>
-        </div>
 
-        <div class="cert-block">
-          <h3 class="cert-title">🏅 Download Your Certificate</h3>
-          <p class="cert-desc">Get your official(ish) PDF certificate — suitable for framing, bragging, or lining the cat's litter tray.</p>
-          <div class="cert-form">
-            <input type="text" id="cert-name" class="cert-input" placeholder="Your name (for the certificate)" />
-            <button class="btn btn-primary" onclick="downloadCertificate()">Download Certificate 📄</button>
+          <div class="hof-submit-block">
+            <h3 class="cert-title">🏆 Submit to Hall of Fame</h3>
+            <p class="cert-desc">Think your score deserves immortality? Submit it to the leaderboard.
+            Your <strong id="hof-score-preview"></strong> Hall of Fame score will be ranked against all other engineers.</p>
+            <button class="btn btn-accent" id="btn-hof-submit" onclick="submitToHoF()" disabled>Submit to Hall of Fame 🚀</button>
+            <div id="hof-submit-status" class="cert-status"></div>
           </div>
-          <div id="cert-status" class="cert-status"></div>
+
+          <div class="cert-block">
+            <h3 class="cert-title">🏅 Download Your Certificate</h3>
+            <p class="cert-desc">Get your official(ish) PDF certificate — suitable for framing, bragging, or lining the cat's litter tray.</p>
+            <button class="btn btn-primary" id="btn-cert-download" onclick="downloadCertificate()" disabled>Download Certificate 📄</button>
+            <div id="cert-status" class="cert-status"></div>
+          </div>
         </div>
 
         <div class="results-actions">
