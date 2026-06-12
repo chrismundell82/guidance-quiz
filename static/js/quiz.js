@@ -22,9 +22,6 @@ function showScreen(id) {
   }
 }
 
-function onNameInput() {
-  // reserved for future use
-}
 
 
   const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
