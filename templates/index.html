@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>AtkinsRéalis Guidance Notes Quiz</title>
+  <title>AtkinsRealis Guidance Notes Quiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Condensed:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css" />
@@ -14,12 +14,10 @@
   <header class="header">
     <div class="header-inner">
       <div class="header-logo">
-        <svg width="140" height="36" viewBox="0 0 140 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <text x="0" y="26" font-family="Roboto Condensed, sans-serif" font-weight="700" font-size="22" fill="#ffffff">Atkins</text>
-          <text x="67" y="26" font-family="Roboto Condensed, sans-serif" font-weight="300" font-size="22" fill="#ffffff">Réalis</text>
-        </svg>
+        <img src="/static/images/logo_white.png" alt="AtkinsRealis" />
       </div>
       <div class="header-tagline">Bridges &amp; Structures · Guidance Notes Quiz</div>
+      <button class="btn-hof-nav" onclick="showHallOfFame()">🏆 Hall of Fame</button>
     </div>
   </header>
 
@@ -156,13 +154,23 @@
 
         <div class="results-breakdown" id="results-breakdown"></div>
 
-        <div class="cert-block">
-          <h3 class="cert-title">🏅 Claim Your Certificate</h3>
-          <p class="cert-desc">We'll email you an official(ish) certificate. Not recognised by any professional body. Still fun.</p>
+        <div class="hof-submit-block">
+          <h3 class="cert-title">🏆 Submit to Hall of Fame</h3>
+          <p class="cert-desc">Think your score deserves immortality? Submit it to the leaderboard.<br>
+          Your <strong id="hof-score-preview"></strong> Hall of Fame score will be ranked against all other engineers.</p>
           <div class="cert-form">
-            <input type="text" id="cert-name" class="cert-input" placeholder="Your name (for bragging rights)" />
-            <input type="email" id="cert-email" class="cert-input" placeholder="your.email@atkinsrealis.com" />
-            <button class="btn btn-primary" onclick="sendCertificate()">Send My Certificate 📧</button>
+            <input type="text" id="hof-name" class="cert-input" placeholder="Your name (choose wisely, it's permanent)" maxlength="50" />
+            <button class="btn btn-accent" onclick="submitToHoF()">Submit to Hall of Fame 🚀</button>
+          </div>
+          <div id="hof-submit-status" class="cert-status"></div>
+        </div>
+
+        <div class="cert-block">
+          <h3 class="cert-title">🏅 Download Your Certificate</h3>
+          <p class="cert-desc">Get your official(ish) PDF certificate — suitable for framing, bragging, or lining the cat's litter tray.</p>
+          <div class="cert-form">
+            <input type="text" id="cert-name" class="cert-input" placeholder="Your name (for the certificate)" />
+            <button class="btn btn-primary" onclick="downloadCertificate()">Download Certificate 📄</button>
           </div>
           <div id="cert-status" class="cert-status"></div>
         </div>
@@ -174,11 +182,61 @@
       </div>
     </section>
 
+    <!-- SCREEN 6: Hall of Fame -->
+    <section id="screen-hof" class="screen">
+      <div class="card">
+        <div class="hof-header">
+          <h2 class="section-title">🏆 Hall of Fame</h2>
+          <p class="hof-subtitle">The finest engineering minds AtkinsRealis has to offer.<br>
+          <em>Or at least the ones who happened to click the right answers.</em></p>
+        </div>
+
+        <div class="hof-scoring-info">
+          <h4>How scores are calculated:</h4>
+          <div class="hof-scoring-grid">
+            <div class="hof-score-pill">🛡️ Guardian × 1.0</div>
+            <div class="hof-score-pill">⚔️ Champion × 1.5</div>
+            <div class="hof-score-pill">⚡ God × 2.0</div>
+            <div class="hof-score-pill">10 Qs × 0.8</div>
+            <div class="hof-score-pill">20 Qs × 1.0</div>
+            <div class="hof-score-pill">30 Qs × 1.15</div>
+          </div>
+          <p class="hof-formula">Score = % correct × difficulty × question count &nbsp;·&nbsp; Max possible: <strong>230</strong></p>
+        </div>
+
+        <div id="hof-loading" class="hof-loading">Loading the legends...</div>
+        <div id="hof-empty" class="hof-empty" style="display:none">
+          No entries yet — be the first to claim your spot! 👑
+        </div>
+        <div id="hof-table-wrap" style="display:none">
+          <table class="hof-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Score</th>
+                <th>Result</th>
+                <th>Difficulty</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="hof-tbody"></tbody>
+          </table>
+          <p class="hof-total" id="hof-total-text"></p>
+        </div>
+
+        <div class="hof-actions">
+          <button class="btn btn-outline" onclick="showScreen('screen-welcome')">← Back to Quiz</button>
+          <button class="btn btn-primary" onclick="loadHoF()">↻ Refresh</button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- FOOTER -->
   <footer class="footer">
-    <p>AtkinsRéalis Bridges &amp; Structures · Guidance Notes Quiz · For internal use and entertainment purposes 😄</p>
+    <p>AtkinsRealis Bridges &amp; Structures · Guidance Notes Quiz · For internal use and entertainment purposes 😄</p>
   </footer>
 
   <script src="/static/js/quiz.js"></script>

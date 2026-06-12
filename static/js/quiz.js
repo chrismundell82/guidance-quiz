@@ -173,6 +173,12 @@ function renderResults(data) {
   // Message
   document.getElementById('results-message').textContent = data.message;
 
+  // HoF score preview
+  const hofPreview = document.getElementById('hof-score-preview');
+  if (hofPreview && data.hof_score !== undefined) {
+    hofPreview.textContent = `${data.hof_score}-point`;
+  }
+
   // Breakdown
   const breakdown = document.getElementById('results-breakdown');
   if (data.results && data.results.length) {
@@ -244,36 +250,48 @@ function launchFireworks(verdict) {
   setTimeout(() => { container.innerHTML = ''; }, 3000);
 }
 
-async function sendCertificate() {
+async function downloadCertificate() {
   const name = document.getElementById('cert-name').value.trim();
-  const email = document.getElementById('cert-email').value.trim();
   const status = document.getElementById('cert-status');
 
-  if (!email) {
-    status.textContent = 'Please enter your email address, clever clogs.';
+  if (!name) {
+    status.textContent = 'Please enter your name so we can put it on the certificate!';
     status.className = 'cert-status err';
     return;
   }
 
-  status.textContent = 'Dispatching your certificate via carrier pigeon... (actually SMTP)';
+  status.textContent = 'Generating your certificate... 🖨️';
   status.className = 'cert-status';
 
   try {
-    const res = await fetch('/api/send-certificate', {
+    const res = await fetch('/api/download-certificate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email })
+      body: JSON.stringify({ name })
     });
-    const data = await res.json();
-    if (data.success) {
-      status.textContent = '✅ Certificate sent! Check your inbox (and spam, just in case).';
-      status.className = 'cert-status ok';
-    } else {
-      status.textContent = `❌ Couldn't send: ${data.error || 'Unknown error. The email gods are unhappy.'}`;
+
+    if (!res.ok) {
+      const data = await res.json();
+      status.textContent = `❌ ${data.error || 'Something went wrong'}`;
       status.className = 'cert-status err';
+      return;
     }
+
+    // Trigger download
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `GuidanceQuiz_Certificate_${name.replace(/\s+/g, '_')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    status.textContent = '✅ Certificate downloaded! Go forth and brag.';
+    status.className = 'cert-status ok';
   } catch (err) {
-    status.textContent = '❌ Network error. Please try again.';
+    status.textContent = '❌ Download failed. Please try again.';
     status.className = 'cert-status err';
   }
 }
@@ -293,4 +311,118 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ============================================================
+//  Hall of Fame
+// ============================================================
+
+const DIFF_LABELS = {
+  'Guidance Guardian': 'guardian',
+  'Guidance Champion': 'champion',
+  'Guidance God': 'god'
+};
+
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
+function showHallOfFame() {
+  showScreen('screen-hof');
+  loadHoF();
+}
+
+async function loadHoF() {
+  document.getElementById('hof-loading').style.display = 'block';
+  document.getElementById('hof-table-wrap').style.display = 'none';
+  document.getElementById('hof-empty').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/hof');
+    const data = await res.json();
+
+    document.getElementById('hof-loading').style.display = 'none';
+
+    if (!data.entries || data.entries.length === 0) {
+      document.getElementById('hof-empty').style.display = 'block';
+      return;
+    }
+
+    const tbody = document.getElementById('hof-tbody');
+    tbody.innerHTML = '';
+
+    data.entries.forEach((e, i) => {
+      const rank = i + 1;
+      const medal = RANK_MEDALS[i] || `#${rank}`;
+      const diffKey = DIFF_LABELS[e.difficulty] || 'guardian';
+      const diffClass = `hof-diff-${diffKey}`;
+      const rankClass = rank <= 3 ? `hof-rank-${rank}` : '';
+      const date = e.submitted_at ? e.submitted_at.split(' ')[0] : '';
+
+      tbody.innerHTML += `
+        <tr>
+          <td class="hof-rank ${rankClass}">${medal}</td>
+          <td><strong>${escapeHtml(e.name)}</strong></td>
+          <td class="hof-hof-score">${e.hof_score}</td>
+          <td>${e.score_pct}% &nbsp;<span style="color:#999;font-size:12px;">(${e.correct}/${e.total})</span></td>
+          <td><span class="hof-diff-badge ${diffClass}">${escapeHtml(e.difficulty)}</span></td>
+          <td style="color:#999;font-size:12px;">${date}</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById('hof-table-wrap').style.display = 'block';
+
+    const totalText = data.total > 20
+      ? `Showing top 20 of ${data.total} total entries`
+      : `${data.total} engineer${data.total === 1 ? '' : 's'} on the board`;
+    document.getElementById('hof-total-text').textContent = totalText;
+
+  } catch (err) {
+    document.getElementById('hof-loading').textContent = 'Failed to load — the Hall of Fame is having an existential crisis. Try refreshing.';
+  }
+}
+
+async function submitToHoF() {
+  const name = document.getElementById('hof-name').value.trim();
+  const status = document.getElementById('hof-submit-status');
+
+  if (!name) {
+    status.textContent = 'You need to enter a name — anonymous glory is still just mediocrity.';
+    status.className = 'cert-status err';
+    return;
+  }
+
+  status.textContent = 'Submitting your legendary score...';
+  status.className = 'cert-status';
+
+  try {
+    const res = await fetch('/api/hof-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      const rankMsg = data.rank === 1
+        ? "🥇 YOU'RE NUMBER ONE! Top of the leaderboard — frame this moment."
+        : data.rank <= 3
+        ? `🏅 Rank #${data.rank}! Podium finish. The guidance gods smile upon you.`
+        : data.rank <= 10
+        ? `⭐ Rank #${data.rank} — Top 10! Not bad at all, hotshot.`
+        : `📋 Rank #${data.rank} — you're on the board! Every legend starts somewhere.`;
+
+      status.textContent = `✅ Score of ${data.hof_score} submitted! ${rankMsg}`;
+      status.className = 'cert-status ok';
+
+      // Disable the button to prevent double submission
+      document.querySelector('.hof-submit-block .btn').disabled = true;
+      document.querySelector('.hof-submit-block .btn').textContent = '✅ Submitted!';
+    } else {
+      status.textContent = `❌ ${data.error}`;
+      status.className = 'cert-status err';
+    }
+  } catch (err) {
+    status.textContent = '❌ Failed to submit. Please try again.';
+    status.className = 'cert-status err';
+  }
 }

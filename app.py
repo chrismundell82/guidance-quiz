@@ -1,15 +1,63 @@
 import os
 import random
 import json
-import urllib.request
-import urllib.error
-from flask import Flask, render_template, request, jsonify, session
+import sqlite3
+from datetime import datetime
+from io import BytesIO
+from flask import Flask, render_template, request, jsonify, session, send_file
 import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "guidance-quiz-secret-2024")
 
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), "Guidance_Notes_-_Quiz_Questions.xlsx")
+DB_PATH = os.environ.get("DASHBOARD_DB", os.path.join(os.path.dirname(__file__), "hof.db"))
+
+# Scoring multipliers
+DIFF_MULTIPLIER = {"guardian": 1.0, "champion": 1.5, "god": 2.0}
+COUNT_MULTIPLIER = {10: 0.8, 20: 1.0, 30: 1.15}
+MAX_HOF_ENTRIES = 100  # store top 100, display top 20
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hall_of_fame (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                score_pct INTEGER NOT NULL,
+                correct INTEGER NOT NULL,
+                total INTEGER NOT NULL,
+                difficulty TEXT NOT NULL,
+                hof_score REAL NOT NULL,
+                submitted_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+
+def calculate_hof_score(pct, total, difficulty):
+    diff_mult = DIFF_MULTIPLIER.get(difficulty, 1.0)
+    # Find nearest count multiplier key
+    count_mult = COUNT_MULTIPLIER.get(total, 1.0)
+    if total not in COUNT_MULTIPLIER:
+        # Interpolate for edge cases
+        if total <= 10:
+            count_mult = 0.8
+        elif total <= 20:
+            count_mult = 0.8 + (total - 10) / 10 * 0.2
+        else:
+            count_mult = 1.0 + (total - 20) / 10 * 0.15
+    return round(pct * diff_mult * count_mult, 1)
+
+
+init_db()
 
 DIFFICULTY_MAP = {
     "guardian": "Guidance Guardian",
@@ -129,6 +177,9 @@ def submit_quiz():
         message = "Oh dear. Have you actually read ANY guidance notes? The bridges are judging you right now. Back to the books! 📚"
         image = "angry.jpg"
 
+    # Calculate Hall of Fame score
+    hof_score = calculate_hof_score(pct, total, difficulty)
+
     session["last_result"] = {
         "score": correct_count,
         "total": total,
@@ -136,7 +187,9 @@ def submit_quiz():
         "verdict": verdict,
         "message": message,
         "image": image,
-        "difficulty": DIFFICULTY_LABELS.get(difficulty, difficulty)
+        "difficulty": DIFFICULTY_LABELS.get(difficulty, difficulty),
+        "difficulty_key": difficulty,
+        "hof_score": hof_score
     }
 
     return jsonify({
@@ -147,6 +200,7 @@ def submit_quiz():
         "message": message,
         "image": image,
         "difficulty": DIFFICULTY_LABELS.get(difficulty, difficulty),
+        "hof_score": hof_score,
         "results": results
     })
 
@@ -154,96 +208,249 @@ def submit_quiz():
 
 
 
-@app.route("/debug-email")
-def debug_email():
-    resend_key = os.environ.get("RESEND_API_KEY", "")
-    if not resend_key:
-        return "RESEND_API_KEY is NOT set in environment variables"
-    return f"RESEND_API_KEY is set — starts with: {resend_key[:8]}... length: {len(resend_key)}"
-
-
-@app.route("/api/send-certificate", methods=["POST"])
-def send_certificate():
+@app.route("/api/hof-submit", methods=["POST"])
+def hof_submit():
     data = request.json
-    email = data.get("email", "").strip()
-    name = data.get("name", "Engineer").strip()
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Please enter your name!"}), 400
+    if len(name) > 50:
+        return jsonify({"error": "Name too long — we're making a leaderboard, not a novel."}), 400
 
     result = session.get("last_result")
-    if not result or not email:
-        return jsonify({"error": "Missing data"}), 400
+    if not result:
+        return jsonify({"error": "No quiz result found — complete the quiz first!"}), 400
 
-    resend_key = os.environ.get("RESEND_API_KEY", "")
-    from_email = os.environ.get("FROM_EMAIL", "onboarding@resend.dev")
-
-    if not resend_key:
-        return jsonify({"error": "Email not configured on server"}), 500
-
-    verdict_titles = {
-        "outstanding": "🏆 Guidance God Tier",
-        "satisfactory": "👍 Adequately Guided",
-        "poor": "📚 Guidance Note Apprentice"
-    }
-    title = verdict_titles.get(result["verdict"], "Quiz Complete")
-
-    html_body = f"""
-    <html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #f4f6f9; padding: 20px;">
-      <div style="background: #002147; padding: 24px 28px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 1px;">AtkinsRéalis</h1>
-        <p style="color: rgba(255,255,255,0.7); margin: 6px 0 0; font-size: 13px;">Bridges &amp; Structures · Guidance Notes Quiz</p>
-      </div>
-      <div style="background: #ffffff; padding: 32px 28px; border-radius: 0 0 10px 10px; border: 1px solid #e0e4ea; border-top: none;">
-        <p style="font-size: 13px; color: #E4002B; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin: 0 0 10px;">{title}</p>
-        <h2 style="color: #002147; font-size: 22px; margin: 0 0 20px;">Dear {name},</h2>
-        <p style="font-size: 15px; color: #444; line-height: 1.6;">
-          This is to certify that you completed the <strong>{result['difficulty']}</strong> level quiz with the following result:
-        </p>
-        <div style="text-align: center; background: #f0f4f8; border-radius: 10px; padding: 24px; margin: 24px 0;">
-          <div style="font-size: 60px; font-weight: 700; color: #002147; line-height: 1;">{result['pct']}%</div>
-          <div style="font-size: 17px; color: #555; margin-top: 8px;">{result['score']} out of {result['total']} correct</div>
-        </div>
-        <p style="font-size: 15px; color: #444; line-height: 1.6; font-style: italic;">"{result['message']}"</p>
-        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #eee;">
-          <p style="font-size: 13px; color: #999; line-height: 1.6; margin: 0;">
-            AtkinsRéalis Bridges &amp; Structures Guidance Team<br>
-            <em>This certificate carries absolutely no professional accreditation whatsoever.<br>
-            But it does prove you had 10 minutes to spare, which is something.</em>
-          </p>
-        </div>
-      </div>
-    </body></html>
-    """
-
-    payload = json.dumps({
-        "from": "AtkinsRéalis Guidance Quiz <onboarding@resend.dev>",
-        "to": [email],
-        "subject": f"Your Guidance Notes Quiz Certificate — {result['pct']}% ({result['difficulty']})",
-        "html": html_body
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {resend_key}",
-            "Content-Type": "application/json"
-        },
-        method="POST"
-    )
+    hof_score = result.get("hof_score", 0)
+    difficulty = result.get("difficulty_key", "guardian")
 
     try:
-        with urllib.request.urlopen(req) as resp:
-            body = resp.read().decode("utf-8", errors="ignore")
-            if resp.status in (200, 201, 202):
-                return jsonify({"success": True, "detail": body})
-            else:
-                return jsonify({"error": f"Resend status {resp.status}: {body}"}), 500
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="ignore")
-        return jsonify({"error": f"Resend HTTP {e.code}: {body}"}), 500
-    except urllib.error.URLError as e:
-        return jsonify({"error": f"Network error: {str(e.reason)}"}), 500
+        with get_db() as conn:
+            conn.execute("""
+                INSERT INTO hall_of_fame (name, score_pct, correct, total, difficulty, hof_score, submitted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                name,
+                result["pct"],
+                result["score"],
+                result["total"],
+                result["difficulty"],
+                hof_score,
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+            ))
+            conn.commit()
+
+            # Get this entry's rank
+            rank = conn.execute("""
+                SELECT COUNT(*) + 1 as rank FROM hall_of_fame
+                WHERE hof_score > ?
+            """, (hof_score,)).fetchone()["rank"]
+
+        return jsonify({"success": True, "rank": rank, "hof_score": hof_score})
     except Exception as e:
-        return jsonify({"error": f"Unexpected: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/hof", methods=["GET"])
+def hof_get():
+    try:
+        with get_db() as conn:
+            rows = conn.execute("""
+                SELECT name, score_pct, correct, total, difficulty, hof_score, submitted_at
+                FROM hall_of_fame
+                ORDER BY hof_score DESC
+                LIMIT 20
+            """).fetchall()
+            total_entries = conn.execute("SELECT COUNT(*) as c FROM hall_of_fame").fetchone()["c"]
+
+        entries = [dict(r) for r in rows]
+        return jsonify({"entries": entries, "total": total_entries})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/download-certificate", methods=["POST"])
+def download_certificate():
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Image as RLImage
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+
+    data = request.json
+    name = data.get("name", "Engineer").strip() or "Engineer"
+
+    result = session.get("last_result")
+    if not result:
+        return jsonify({"error": "No quiz result found — please complete the quiz first"}), 400
+
+    # Colours
+    NAVY   = colors.HexColor("#192D38")
+    RED    = colors.HexColor("#3F32F1")
+    GOLD   = colors.HexColor("#B9FF00")
+    LGREY  = colors.HexColor("#F4F6F9")
+    MGREY  = colors.HexColor("#666B73")
+    WHITE  = colors.white
+
+    verdict_data = {
+        "outstanding": {
+            "title": "🏆  GUIDANCE GOD TIER",
+            "subtitle": "Outstanding Performance",
+            "colour": colors.HexColor("#B9FF00"),
+            "text_colour": colors.HexColor("#3a6600"),
+            "flavour": "You absolute legend. Chris Hendy himself would shed a single proud tear.\nConsider yourself a fully certified Guidance God — the bridges bow before you."
+        },
+        "satisfactory": {
+            "title": "👍  ADEQUATELY GUIDED",
+            "subtitle": "Satisfactory Performance",
+            "colour": colors.HexColor("#3F32F1"),
+            "text_colour": colors.HexColor("#3F32F1"),
+            "flavour": "You've clearly opened at least a few guidance notes in your time.\nNot bad at all — just don't let it go to your head. The bridges are watching."
+        },
+        "poor": {
+            "title": "📚  GUIDANCE NOTE APPRENTICE",
+            "subtitle": "Needs Improvement",
+            "colour": colors.HexColor("#c0392b"),
+            "text_colour": colors.HexColor("#c0392b"),
+            "flavour": "Oh dear. The guidance notes are disappointed in you.\nBut every legend has to start somewhere — back to the archives!"
+        }
+    }
+    vd = verdict_data.get(result["verdict"], verdict_data["satisfactory"])
+
+    buf = BytesIO()
+    W, H = A4  # 595 x 842 pts
+
+    c = canvas.Canvas(buf, pagesize=A4)
+
+    # --- Navy header band ---
+    c.setFillColor(NAVY)
+    c.rect(0, H - 110*mm, W, 110*mm, fill=1, stroke=0)
+
+    # Header text - use logo image
+    logo_path = os.path.join(os.path.dirname(__file__), "static", "images", "logo_white.png")
+    if os.path.exists(logo_path):
+        logo_w = 55*mm
+        logo_h = 7.5*mm
+        c.drawImage(logo_path, W/2 - logo_w/2, H - 34*mm, width=logo_w, height=logo_h,
+                    preserveAspectRatio=True, mask="auto")
+    else:
+        c.setFillColor(WHITE)
+        c.setFont("Helvetica-Bold", 26)
+        c.drawCentredString(W/2, H - 32*mm, "AtkinsRealis")
+    c.setFont("Helvetica", 13)
+    c.setFillColor(colors.HexColor("#C4DCE7"))
+    c.drawCentredString(W/2, H - 44*mm, "Bridges & Structures  ·  Guidance Notes Quiz")
+
+    # Red accent line
+    c.setStrokeColor(colors.HexColor("#3F32F1"))
+    c.setLineWidth(3)
+    c.line(40*mm, H - 52*mm, W - 40*mm, H - 52*mm)
+
+    # CERTIFICATE OF title
+    c.setFillColor(WHITE)
+    c.setFont("Helvetica-Bold", 32)
+    c.drawCentredString(W/2, H - 70*mm, "CERTIFICATE OF ACHIEVEMENT")
+    c.setFont("Helvetica", 12)
+    c.setFillColor(colors.HexColor("#C4DCE7"))
+    c.drawCentredString(W/2, H - 80*mm, "(Official-ish)")
+
+    # --- Body ---
+    body_top = H - 120*mm
+
+    # "This certifies that"
+    c.setFillColor(MGREY)
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(W/2, body_top, "This certifies that")
+
+    # Name
+    c.setFillColor(NAVY)
+    c.setFont("Helvetica-Bold", 30)
+    c.drawCentredString(W/2, body_top - 16*mm, name)
+
+    # Underline name
+    name_width = c.stringWidth(name, "Helvetica-Bold", 30)
+    c.setStrokeColor(colors.HexColor("#3F32F1"))
+    c.setLineWidth(1.5)
+    c.line(W/2 - name_width/2, body_top - 18*mm, W/2 + name_width/2, body_top - 18*mm)
+
+    # "has completed"
+    c.setFillColor(MGREY)
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(W/2, body_top - 27*mm, "has completed the")
+
+    # Difficulty
+    c.setFillColor(NAVY)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(W/2, body_top - 36*mm, result["difficulty"] + " Quiz")
+
+    # Score box
+    box_y = body_top - 68*mm
+    box_w = 80*mm
+    box_h = 28*mm
+    box_x = W/2 - box_w/2
+
+    c.setFillColor(LGREY)
+    c.roundRect(box_x, box_y, box_w, box_h, 4*mm, fill=1, stroke=0)
+
+    c.setFillColor(vd["text_colour"])
+    c.setFont("Helvetica-Bold", 36)
+    c.drawCentredString(W/2, box_y + 16*mm, f"{result['pct']}%")
+    c.setFillColor(MGREY)
+    c.setFont("Helvetica", 11)
+    c.drawCentredString(W/2, box_y + 7*mm, f"{result['score']} out of {result['total']} correct")
+
+    # Verdict title
+    c.setFillColor(vd["text_colour"])
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(W/2, box_y - 10*mm, vd["title"])
+
+    # Flavour text — split on \n
+    c.setFillColor(MGREY)
+    c.setFont("Helvetica-Oblique", 11)
+    lines = vd["flavour"].split("\n")
+    for i, line in enumerate(lines):
+        c.drawCentredString(W/2, box_y - 20*mm - i*6*mm, line)
+
+    # Result image
+    img_map = {
+        "happy.jpg": "happy",
+        "satisfied.jpg": "satisfied",
+        "angry.jpg": "angry"
+    }
+    img_path = os.path.join(os.path.dirname(__file__), "static", "images", result["image"])
+    if os.path.exists(img_path):
+        img_size = 28*mm
+        img_x = W/2 - img_size/2
+        img_y = box_y - 58*mm
+        c.drawImage(img_path, img_x, img_y, width=img_size, height=img_size,
+                    preserveAspectRatio=True, mask="auto")
+
+    # --- Footer band ---
+    c.setFillColor(NAVY)
+    c.rect(0, 0, W, 22*mm, fill=1, stroke=0)
+    c.setFillColor(colors.HexColor("#C4DCE7"))
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(W/2, 13*mm, "AtkinsRealis Bridges & Structures Guidance Team")
+    c.setFillColor(colors.HexColor("#6688aa"))
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawCentredString(W/2, 7*mm,
+        "This certificate carries absolutely no professional accreditation whatsoever. But we think it looks nice.")
+
+    c.save()
+    buf.seek(0)
+
+    safe_name = "".join(c2 for c2 in name if c2.isalnum() or c2 in (" ", "-", "_")).strip() or "Engineer"
+    filename = f"GuidanceQuiz_Certificate_{safe_name.replace(' ', '_')}.pdf"
+
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename
+    )
 
 
 if __name__ == "__main__":
