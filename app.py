@@ -245,7 +245,7 @@ def hof_submit():
                     hof_score,
                     datetime.utcnow().strftime("%Y-%m-%d %H:%M")
                 ))
-                cur.execute("SELECT COUNT(*) + 1 as rank FROM hall_of_fame WHERE hof_score > %s", (hof_score,))
+                cur.execute("SELECT COUNT(*) FROM hall_of_fame WHERE hof_score > %s", (hof_score,))
                 rank = cur.fetchone()["count"] + 1
             conn.commit()
 
@@ -269,7 +269,7 @@ def hof_get():
                     LIMIT 20
                 """)
                 rows = cur.fetchall()
-                cur.execute("SELECT COUNT(*) as c FROM hall_of_fame")
+                cur.execute("SELECT COUNT(*) FROM hall_of_fame")
                 total_entries = cur.fetchone()["count"]
 
         entries = [dict(r) for r in rows]
@@ -292,6 +292,13 @@ def download_certificate():
     data = request.json
     name = data.get("name", "Engineer").strip() or "Engineer"
 
+    # Strip any emoji/non-latin chars that Helvetica can't render
+    import re
+    def pdf_safe(text):
+        return re.sub(r'[^\x00-\x7F\u00C0-\u024F]', '', text).strip() or "Engineer"
+
+    name = pdf_safe(name)
+
     result = session.get("last_result")
     if not result:
         return jsonify({"error": "No quiz result found — please complete the quiz first"}), 400
@@ -306,21 +313,21 @@ def download_certificate():
 
     verdict_data = {
         "outstanding": {
-            "title": "🏆  GUIDANCE GOD TIER",
+            "title": "*** GUIDANCE GOD TIER ***",
             "subtitle": "Outstanding Performance",
             "colour": colors.HexColor("#B9FF00"),
             "text_colour": colors.HexColor("#3a6600"),
             "flavour": "You absolute legend. Chris Hendy himself would shed a single proud tear.\nConsider yourself a fully certified Guidance God — the bridges bow before you."
         },
         "satisfactory": {
-            "title": "👍  ADEQUATELY GUIDED",
+            "title": "ADEQUATELY GUIDED",
             "subtitle": "Satisfactory Performance",
             "colour": colors.HexColor("#3F32F1"),
             "text_colour": colors.HexColor("#3F32F1"),
             "flavour": "You've clearly opened at least a few guidance notes in your time.\nNot bad at all — just don't let it go to your head. The bridges are watching."
         },
         "poor": {
-            "title": "📚  GUIDANCE NOTE APPRENTICE",
+            "title": "GUIDANCE NOTE APPRENTICE",
             "subtitle": "Needs Improvement",
             "colour": colors.HexColor("#c0392b"),
             "text_colour": colors.HexColor("#c0392b"),
