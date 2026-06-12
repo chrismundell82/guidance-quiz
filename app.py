@@ -518,29 +518,25 @@ def download_certificate():
     c.setFont("Helvetica", 11)
     c.drawCentredString(W/2, box_y + 7*mm, f"{result['score']} out of {result['total']} correct")
 
-    # Verdict title
+    # Verdict title — below score box
     c.setFillColor(vd["text_colour"])
     c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(W/2, box_y - 10*mm, vd["title"])
+    c.drawCentredString(W/2, box_y - 12*mm, vd["title"])
 
     # Flavour text — split on \n
     c.setFillColor(MGREY)
     c.setFont("Helvetica-Oblique", 11)
     lines = vd["flavour"].split("\n")
     for i, line in enumerate(lines):
-        c.drawCentredString(W/2, box_y - 20*mm - i*6*mm, line)
+        c.drawCentredString(W/2, box_y - 22*mm - i*7*mm, line)
 
-    # Result image
-    img_map = {
-        "happy.jpg": "happy",
-        "satisfied.jpg": "satisfied",
-        "angry.jpg": "angry"
-    }
+    # Result image — positioned below ALL text, above footer
     img_path = os.path.join(os.path.dirname(__file__), "static", "images", result["image"])
     if os.path.exists(img_path):
-        img_size = 52*mm
+        img_size = 44*mm
         img_x = W/2 - img_size/2
-        img_y = box_y - 72*mm
+        # Footer is 22mm tall, place image just above it with 8mm gap
+        img_y = 22*mm + 8*mm
         c.drawImage(img_path, img_x, img_y, width=img_size, height=img_size,
                     preserveAspectRatio=True, mask="auto")
 
@@ -567,6 +563,20 @@ def download_certificate():
         as_attachment=True,
         download_name=filename
     )
+
+
+@app.route("/admin/clear-hof", methods=["POST"])
+def admin_clear_hof():
+    if not admin_required():
+        return jsonify({"error": "Unauthorised"}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM hall_of_fame")
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/admin/migrate")

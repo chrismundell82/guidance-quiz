@@ -218,13 +218,11 @@ function toggleBreakdown(el) {
 }
 
 function launchFireworks(verdict) {
-  if (verdict === 'poor') return; // No fireworks for shame
-
   const container = document.getElementById('fireworks-container');
   container.innerHTML = '';
 
-  const colours = ['#E4002B', '#002147', '#FFD700', '#00C851', '#FF6D00', '#AA00FF'];
-  const count = verdict === 'outstanding' ? 80 : 40;
+  const colours = ['#3F32F1', '#B9FF00', '#C4DCE7', '#FFD700', '#ff6b9d', '#00C851'];
+  const count = verdict === 'outstanding' ? 100 : verdict === 'satisfactory' ? 60 : 25;
 
   for (let i = 0; i < count; i++) {
     setTimeout(() => {

@@ -138,6 +138,7 @@
     </select>
     <input type="text" id="filter-search" placeholder="Search questions..." oninput="applyFilter()" />
     <button class="btn btn-success" onclick="openAddModal()">+ Add Question</button>
+    <button class="btn btn-danger" style="font-size:14px;padding:9px 18px;" onclick="clearHoF()">🗑️ Clear Hall of Fame</button>
   </div>
 
   <table id="q-table">
@@ -375,6 +376,17 @@
   document.getElementById('modal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
   });
+
+  async function clearHoF() {
+    if (!confirm('Are you sure you want to clear the entire Hall of Fame?\n\nThis will delete ALL scores permanently. There is no undo.')) return;
+    const res = await fetch('/admin/clear-hof', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showStatus('Hall of Fame cleared!', 'ok');
+    } else {
+      showStatus(data.error || 'Error clearing Hall of Fame', 'err');
+    }
+  }
 
   loadQuestions();
 </script>
