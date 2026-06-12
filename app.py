@@ -1,7 +1,8 @@
 import os
 import random
 import json
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from datetime import datetime
 from io import BytesIO
 from flask import Flask, render_template, request, jsonify, session, send_file
@@ -11,43 +12,45 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "guidance-quiz-secret-2024")
 
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), "Guidance_Notes_-_Quiz_Questions.xlsx")
-DB_PATH = os.environ.get("DASHBOARD_DB", os.path.join(os.path.dirname(__file__), "hof.db"))
+DB_URL = os.environ.get("DATABASE_URL", "")
 
 # Scoring multipliers
 DIFF_MULTIPLIER = {"guardian": 1.0, "champion": 1.5, "god": 2.0}
 COUNT_MULTIPLIER = {10: 0.8, 20: 1.0, 30: 1.15}
-MAX_HOF_ENTRIES = 100  # store top 100, display top 20
+MAX_HOF_ENTRIES = 100
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 
 def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS hall_of_fame (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                score_pct INTEGER NOT NULL,
-                correct INTEGER NOT NULL,
-                total INTEGER NOT NULL,
-                difficulty TEXT NOT NULL,
-                hof_score REAL NOT NULL,
-                submitted_at TEXT NOT NULL
-            )
-        """)
-        conn.commit()
+    if not DB_URL:
+        return
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS hall_of_fame (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        score_pct INTEGER NOT NULL,
+                        correct INTEGER NOT NULL,
+                        total INTEGER NOT NULL,
+                        difficulty TEXT NOT NULL,
+                        hof_score REAL NOT NULL,
+                        submitted_at TEXT NOT NULL
+                    )
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"DB init warning: {e}")
 
 
 def calculate_hof_score(pct, total, difficulty):
     diff_mult = DIFF_MULTIPLIER.get(difficulty, 1.0)
-    # Find nearest count multiplier key
     count_mult = COUNT_MULTIPLIER.get(total, 1.0)
     if total not in COUNT_MULTIPLIER:
-        # Interpolate for edge cases
         if total <= 10:
             count_mult = 0.8
         elif total <= 20:
@@ -224,27 +227,27 @@ def hof_submit():
     hof_score = result.get("hof_score", 0)
     difficulty = result.get("difficulty_key", "guardian")
 
+    if not DB_URL:
+        return jsonify({"error": "Database not configured"}), 500
+
     try:
         with get_db() as conn:
-            conn.execute("""
-                INSERT INTO hall_of_fame (name, score_pct, correct, total, difficulty, hof_score, submitted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                name,
-                result["pct"],
-                result["score"],
-                result["total"],
-                result["difficulty"],
-                hof_score,
-                datetime.utcnow().strftime("%Y-%m-%d %H:%M")
-            ))
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO hall_of_fame (name, score_pct, correct, total, difficulty, hof_score, submitted_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    name,
+                    result["pct"],
+                    result["score"],
+                    result["total"],
+                    result["difficulty"],
+                    hof_score,
+                    datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+                ))
+                cur.execute("SELECT COUNT(*) + 1 as rank FROM hall_of_fame WHERE hof_score > %s", (hof_score,))
+                rank = cur.fetchone()["count"] + 1
             conn.commit()
-
-            # Get this entry's rank
-            rank = conn.execute("""
-                SELECT COUNT(*) + 1 as rank FROM hall_of_fame
-                WHERE hof_score > ?
-            """, (hof_score,)).fetchone()["rank"]
 
         return jsonify({"success": True, "rank": rank, "hof_score": hof_score})
     except Exception as e:
@@ -253,15 +256,21 @@ def hof_submit():
 
 @app.route("/api/hof", methods=["GET"])
 def hof_get():
+    if not DB_URL:
+        return jsonify({"entries": [], "total": 0})
+
     try:
         with get_db() as conn:
-            rows = conn.execute("""
-                SELECT name, score_pct, correct, total, difficulty, hof_score, submitted_at
-                FROM hall_of_fame
-                ORDER BY hof_score DESC
-                LIMIT 20
-            """).fetchall()
-            total_entries = conn.execute("SELECT COUNT(*) as c FROM hall_of_fame").fetchone()["c"]
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT name, score_pct, correct, total, difficulty, hof_score, submitted_at
+                    FROM hall_of_fame
+                    ORDER BY hof_score DESC
+                    LIMIT 20
+                """)
+                rows = cur.fetchall()
+                cur.execute("SELECT COUNT(*) as c FROM hall_of_fame")
+                total_entries = cur.fetchone()["count"]
 
         entries = [dict(r) for r in rows]
         return jsonify({"entries": entries, "total": total_entries})
