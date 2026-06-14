@@ -642,6 +642,53 @@ def admin_clear_hof():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/admin/export-questions")
+def admin_export_questions():
+    if not admin_required():
+        from flask import redirect, url_for
+        return redirect(url_for("admin"))
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM questions ORDER BY difficulty, id")
+                rows = cur.fetchall()
+
+        DIFF_DISPLAY = {"guardian": "Guidance Guardian", "champion": "Guidance Champion", "god": "Guidance God"}
+
+        data = []
+        for row in rows:
+            data.append({
+                "Difficulty": DIFF_DISPLAY.get(row["difficulty"], row["difficulty"]),
+                "Ref": row["ref"] or "",
+                "Question": row["question"],
+                "A": row["option_a"],
+                "B": row["option_b"],
+                "C": row["option_c"] or "",
+                "D": row["option_d"] or "",
+                "Answer": row["correct_answer"]
+            })
+
+        df = pd.DataFrame(data, columns=["Difficulty", "Ref", "Question", "A", "B", "C", "D", "Answer"])
+
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Questions", index=False)
+
+            # Auto-size columns
+            ws = writer.sheets["Questions"]
+            for col in ws.columns:
+                max_len = max((len(str(cell.value or "")) for cell in col), default=10)
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 60)
+
+        buf.seek(0)
+        from datetime import date
+        filename = f"GuidanceQuiz_Questions_{date.today().strftime('%Y-%m-%d')}.xlsx"
+        return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         as_attachment=True, download_name=filename)
+    except Exception as e:
+        return f"<p>Export error: {e} <a href='/admin'>Back to admin</a></p>"
+
+
 @app.route("/admin/migrate")
 def admin_migrate():
     if not admin_required():
